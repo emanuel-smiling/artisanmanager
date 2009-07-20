@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+	PROJECT: ARtisan
+	***************************************
+	
+	This work uses FLARToolkit developed by
+	Saqoosha
+	http://www.libspark.org/wiki/saqoosha/FLARToolKit
+	
+	and Papervision3D developed by
+	The Papervision3D Team
+	http://blog.papervision3d.org/
+	
+	ARtisan is a management system for FLARToolkit and Papervision3D.
+	Copyright (C)2009 OneZeroThrice
+
+	This program is free software; you can redistribute it and/or
+	modify it under the terms of the GNU General Public License
+	as published by the Free Software Foundation; either version 3
+	of the License, or (at your option) any later version.
+
+	This program is distributed, with ARtisan completely free, in the hope
+	that it will be useful,	but WITHOUT ANY WARRANTY; without even the
+	implied warranty of	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+	See the	GNU General Public License for more details.
+ 
+	You should have received a copy of the GNU General Public License
+	along with this framework; if not, write to the Free Software
+	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+	For further information please contact
+	info@onezerothrice.com
+ -->
+<mx:Object xmlns="*" xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:events="flash.events.*">
+	<mx:Script>
+		<![CDATA[	
+			import mx.controls.Alert;
+			
+			public var data:BitmapData;
+			
+			private var camera:Camera;
+			private var video:Video;
+			
+			// Creates the video that the data will be drawn from
+			public function init(cameraSettings:Array):Camera
+			{
+				camera = Camera.getCamera();
+				
+				if(!camera)
+				{
+					Alert.show("ARtisan can not find a webcam connected to this computer.  If a webcam is connected, check the Flash Player camera settings.");
+					throw new Error("ARtisan can not find a webcam connected to this computer.  If a webcam is connected, check the Flash Player camera settings.");
+				}
+				camera.setMode(cameraSettings[0], cameraSettings[1], cameraSettings[2]);			
+				video = new Video(camera.width, camera.height);
+				data = new BitmapData(video.width, video.height, false);
+				video.attachCamera(camera);
+				
+				return camera;
+			}
+			
+			// Creates the bitmap data that calculations will be done from
+			public function updateData():void
+			{				
+				data.draw(video);
+			}
+		]]>
+	</mx:Script>
+	<events:EventDispatcher id="dispatcher"/>
+	<mx:Text id="locationText" color="#00FF00"/>
+</mx:Object>

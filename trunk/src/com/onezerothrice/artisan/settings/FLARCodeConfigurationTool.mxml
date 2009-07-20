@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+	PROJECT: ARtisan
+	***************************************
+	
+	This work uses FLARToolkit developed by
+	Saqoosha
+	http://www.libspark.org/wiki/saqoosha/FLARToolKit
+	
+	and Papervision3D developed by
+	The Papervision3D Team
+	http://blog.papervision3d.org/
+	
+	ARtisan is a management system for FLARToolkit and Papervision3D.
+	Copyright (C)2009 OneZeroThrice
+
+	This program is free software; you can redistribute it and/or
+	modify it under the terms of the GNU General Public License
+	as published by the Free Software Foundation; either version 3
+	of the License, or (at your option) any later version.
+
+	This program is distributed, with ARtisan completely free, in the hope
+	that it will be useful,	but WITHOUT ANY WARRANTY; without even the
+	implied warranty of	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+	See the	GNU General Public License for more details.
+ 
+	You should have received a copy of the GNU General Public License
+	along with this framework; if not, write to the Free Software
+	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+	For further information please contact
+	info@onezerothrice.com
+ -->
+<mx:Object xmlns="*" xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:events="flash.events.*">
+	<mx:Script>
+		<![CDATA[
+			import com.onezerothrice.artisan.events.ARtisanSettingsEvent;
+		
+			import org.libspark.flartoolkit.core.FLARCode;
+			
+			private var patternPaths:Array;
+			private var patternsResolution:int;
+			private var borderPercentage:int;
+			private var loadIndex:int = -1;
+			
+			// Output variables
+			private var outputCodes:Array = [];
+			private var markerSizes:Array = [];
+			
+			// Pass the parameters to class wide variables and call for first pattern loading
+			public function setupARPatterns(paths:Array, resolution:int, border:int):void
+			{
+				patternPaths = paths;
+				patternsResolution = resolution;
+				borderPercentage = border;
+				
+				loadNextPattern();
+			}
+			
+			// Increment to the next pattern and load it.  When there are no more patterns, output the results via an event
+			private function loadNextPattern():void
+			{
+				loadIndex++;
+				
+				if(loadIndex < patternPaths.length)
+				{
+					var patternLoader:URLLoader = new URLLoader();
+					patternLoader.addEventListener(IOErrorEvent.IO_ERROR, onPatternLoaderIOError);
+					patternLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onPatternLoaderSecurityError);
+					patternLoader.addEventListener(Event.COMPLETE, onPatternLoaderComplete);
+					patternLoader.load(new URLRequest(patternPaths[loadIndex]));
+				}
+				else
+				{
+					for(var i:int = 0; i < outputCodes.length; i++)
+					{
+						markerSizes.push(patternsResolution);
+					}
+					dispatcher.dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.FLAR_CODES_CONFIGURED, [outputCodes, markerSizes]));
+				}
+			}
+			
+			// If the AR parameters file can't be found
+			private function onPatternLoaderIOError(event:IOErrorEvent):void
+			{
+				throw new Error("ARtisan can not find " + patternPaths[loadIndex] + ".  Please ensure that the file is in the location listed in ARtisan_settings.xml.");
+			}
+			
+			// If the AR parameters file can't be loaded, due to security settings
+			private function onPatternLoaderSecurityError(event:SecurityErrorEvent):void
+			{
+				throw new Error("ARtisan is being blocked from loading " + patternPaths[loadIndex] + " by a security protocol on the server");
+			}
+			
+			// Create a new instance of FLARCode, add it to the return array, and call to load the next pattern
+			private function onPatternLoaderComplete(event:Event):void
+			{
+				event.target.removeEventListener(IOErrorEvent.IO_ERROR, onPatternLoaderIOError);
+				event.target.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, onPatternLoaderSecurityError);
+				event.target.removeEventListener(Event.COMPLETE, onPatternLoaderComplete);
+				
+				var flarCode:FLARCode = new FLARCode(patternsResolution, patternsResolution, borderPercentage, borderPercentage);
+				try
+				{
+					flarCode.loadARPatt(String(event.target.data));
+				}
+				catch(error:*)
+				{
+					throw new Error("ARtisan can not load " + patternPaths[loadIndex] + ".  The file appears to be corrupted.");
+				}				
+				
+				outputCodes.push(flarCode);
+				
+				loadNextPattern();
+			}
+		]]>
+	</mx:Script>
+	<events:EventDispatcher id="dispatcher"/>
+</mx:Object>

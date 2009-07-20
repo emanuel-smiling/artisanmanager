@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+	PROJECT: ARtisan
+	***************************************
+	
+	This work uses FLARToolkit developed by
+	Saqoosha
+	http://www.libspark.org/wiki/saqoosha/FLARToolKit
+	
+	and Papervision3D developed by
+	The Papervision3D Team
+	http://blog.papervision3d.org/
+	
+	ARtisan is a management system for FLARToolkit and Papervision3D.
+	Copyright (C)2009 OneZeroThrice
+
+	This program is free software; you can redistribute it and/or
+	modify it under the terms of the GNU General Public License
+	as published by the Free Software Foundation; either version 3
+	of the License, or (at your option) any later version.
+
+	This program is distributed, with ARtisan completely free, in the hope
+	that it will be useful,	but WITHOUT ANY WARRANTY; without even the
+	implied warranty of	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+	See the	GNU General Public License for more details.
+ 
+	You should have received a copy of the GNU General Public License
+	along with this framework; if not, write to the Free Software
+	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+	For further information please contact
+	info@onezerothrice.com
+ -->
+<mx:Object xmlns="*" xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Script>
+		<![CDATA[
+			import org.libspark.flartoolkit.core.types.matrix.FLARDoubleMatrix34;
+			import org.papervision3d.core.math.Matrix3D;
+			
+			private var matrices:Array;			
+			
+			public function calculate(flarDoubleMatrix:FLARDoubleMatrix34, smoothing:Boolean, smoothAmount:int):org.papervision3d.core.math.Matrix3D
+			{
+				var tempMatrix:org.papervision3d.core.math.Matrix3D = new org.papervision3d.core.math.Matrix3D([flarDoubleMatrix.m01, flarDoubleMatrix.m00,	flarDoubleMatrix.m02,	flarDoubleMatrix.m03,	-flarDoubleMatrix.m11, -flarDoubleMatrix.m10, -flarDoubleMatrix.m12,	-flarDoubleMatrix.m13, flarDoubleMatrix.m21,	flarDoubleMatrix.m20,	flarDoubleMatrix.m22,	flarDoubleMatrix.m23, 0,	0,	0,	0]);
+				if(!smoothing)
+				{
+					return tempMatrix;
+				}
+				else
+				{
+					return getAverage(tempMatrix, smoothAmount);
+				}
+			}
+			
+			public function getAverage(newMatrix:org.papervision3d.core.math.Matrix3D, smoothAmount:int):org.papervision3d.core.math.Matrix3D
+			{
+				if(!matrices)
+				{
+					matrices = new Array(smoothAmount);
+				}
+				
+				for(var i:int = 1; i < matrices.length; i++)
+				{
+					matrices[i - 1] = matrices[i];
+				}
+				matrices[smoothAmount - 1] = newMatrix;
+				
+				var returnMatrix:org.papervision3d.core.math.Matrix3D = new org.papervision3d.core.math.Matrix3D();
+				var tempN:Number = 0;
+				var matrixCount:int = 0;
+				
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n11;
+					}
+				}
+				returnMatrix.n11 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n12;
+					}
+				}
+				returnMatrix.n12 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n13;
+					}
+				}
+				returnMatrix.n13 = tempN / matrixCount; 
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n14;
+					}
+				}
+				returnMatrix.n14 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n21;
+					}
+				}
+				returnMatrix.n21 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n22;
+					}
+				}
+				returnMatrix.n22 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n23;
+					}
+				}
+				returnMatrix.n23 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n24;
+					}
+				}
+				returnMatrix.n24 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n31;
+					}
+				}
+				returnMatrix.n31 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n32;
+					}
+				}
+				returnMatrix.n32 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n33;
+					}
+				}
+				returnMatrix.n33 = tempN / matrixCount;
+				
+				tempN = 0;
+				matrixCount = 0;
+				for(i = 0; i < matrices.length; i++)
+				{
+					if(matrices[i])
+					{
+						matrixCount++;
+						tempN += matrices[i].n34;
+					}
+				}
+				returnMatrix.n34 = tempN / matrixCount;
+				
+				return returnMatrix;
+			}
+		]]>
+	</mx:Script>
+</mx:Object>
