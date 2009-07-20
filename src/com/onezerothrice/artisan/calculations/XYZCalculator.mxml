@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+	PROJECT: ARtisan
+	***************************************
+	
+	This work uses FLARToolkit developed by
+	Saqoosha
+	http://www.libspark.org/wiki/saqoosha/FLARToolKit
+	
+	and Papervision3D developed by
+	The Papervision3D Team
+	http://blog.papervision3d.org/
+	
+	ARtisan is a management system for FLARToolkit and Papervision3D.
+	Copyright (C)2009 OneZeroThrice
+
+	This program is free software; you can redistribute it and/or
+	modify it under the terms of the GNU General Public License
+	as published by the Free Software Foundation; either version 3
+	of the License, or (at your option) any later version.
+
+	This program is distributed, with ARtisan completely free, in the hope
+	that it will be useful,	but WITHOUT ANY WARRANTY; without even the
+	implied warranty of	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+	See the	GNU General Public License for more details.
+ 
+	You should have received a copy of the GNU General Public License
+	along with this framework; if not, write to the Free Software
+	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+	For further information please contact
+	info@onezerothrice.com
+ -->
+<mx:Object xmlns="*" xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Script>
+		<![CDATA[
+			import org.libspark.flartoolkit.core.types.matrix.FLARDoubleMatrix34;
+			
+			import org.papervision3d.objects.DisplayObject3D;
+			import org.papervision3d.core.math.Number3D;
+			import org.papervision3d.core.math.Matrix3D;
+			
+			public function calculate(matrix:org.papervision3d.core.math.Matrix3D):Array
+			{			
+				var testDisplayObject:DisplayObject3D = new DisplayObject3D
+				
+				testDisplayObject.transform = matrix;
+				var rotations:Number3D = org.papervision3d.core.math.Matrix3D.matrix2euler(matrix);
+				
+				
+				return [testDisplayObject.x, testDisplayObject.y, testDisplayObject.z, -rotations.x + 180, -rotations.y, rotations.z - 180];
+			}
+		]]>
+	</mx:Script>
+</mx:Object>

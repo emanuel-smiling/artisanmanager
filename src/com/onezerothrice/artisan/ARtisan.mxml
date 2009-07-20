@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+	PROJECT: ARtisan
+	***************************************
+	
+	This work uses FLARToolkit developed by
+	Saqoosha
+	http://www.libspark.org/wiki/saqoosha/FLARToolKit
+	
+	and Papervision3D developed by
+	The Papervision3D Team
+	http://blog.papervision3d.org/
+	
+	ARtisan is a management system for FLARToolkit and Papervision3D.
+	Copyright (C)2009 OneZeroThrice
+
+	This program is free software; you can redistribute it and/or
+	modify it under the terms of the GNU General Public License
+	as published by the Free Software Foundation; either version 3
+	of the License, or (at your option) any later version.
+
+	This program is distributed, with ARtisan completely free, in the hope
+	that it will be useful,	but WITHOUT ANY WARRANTY; without even the
+	implied warranty of	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+	See the	GNU General Public License for more details.
+ 
+	You should have received a copy of the GNU General Public License
+	along with this framework; if not, write to the Free Software
+	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+	For further information please contact
+	info@onezerothrice.com
+ -->
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:settings="com.onezerothrice.artisan.settings.*" xmlns:calculations="com.onezerothrice.artisan.calculations.*" xmlns:display="com.onezerothrice.artisan.display.*" clipContent="false" creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import com.onezerothrice.artisan.calculations.PapervisionMatrixCalculator;
+			import com.onezerothrice.artisan.events.ARtisanSettingsEvent;
+			import com.onezerothrice.artisan.events.ARtisanCameraEvent;
+			import com.onezerothrice.artisan.calculations.ReturnType;
+			
+			import org.libspark.flartoolkit.core.param.FLARParam;
+			import org.libspark.flartoolkit.detector.FLARMultiMarkerDetector;
+			import org.libspark.flartoolkit.core.raster.rgb.FLARRgbRaster_BitmapData;
+			import org.libspark.flartoolkit.core.transmat.FLARTransMatResult;
+			
+			import org.papervision3d.core.math.Matrix3D;
+			
+			public var outputFunction:Function;
+			public var returnType:String = ReturnType.PV3D_MATRIX;
+			public var smoothing:Boolean = false;
+			public var smoothAmount:int = 3;
+			public var calculationsCamera:Camera;
+			public var displayCamera:Camera;
+			
+			private var numberOfPatterns:int;
+			private var calculators:Array = [];
+			private var flarParam:FLARParam = new FLARParam();
+			private var flarMultiMarkerDetector:FLARMultiMarkerDetector;
+			private var flarRGBRaster:FLARRgbRaster_BitmapData;
+			private var detectorThreshold:int = 80;
+			private var minimumDetectorConfidence:Number = .5;
+			
+			private var cameraOn:Boolean = false;
+			
+			private function init():void
+			{
+				startSettingsLoading();
+			}
+			
+			// Begin settings loading process
+			private function startSettingsLoading():void
+			{
+				addSettingsEventListeners();
+				settingsLoader.loadSettings();
+			}
+			
+			// Callbacks for settings loader
+			private function addSettingsEventListeners():void
+			{
+				settingsLoader.dispatcher.addEventListener(ARtisanSettingsEvent.SETTINGS_LOADED, onSettingsLoaded);
+				settingsLoader.dispatcher.addEventListener(ARtisanSettingsEvent.SETTINGS_SCHEMA_CORRECT, onSettingsSchemaCorrect);
+				settingsLoader.dispatcher.addEventListener(ARtisanSettingsEvent.AR_PARAMETERS_LOADED, onARParametersLoaded);
+				settingsLoader.dispatcher.addEventListener(ARtisanSettingsEvent.FLAR_CODES_CONFIGURED, onFLARCodesConfigured);
+				settingsLoader.dispatcher.addEventListener(ARtisanSettingsEvent.DETECTOR_SETTINGS_LOADED, onDetectorSettingsLoaded);
+				settingsLoader.dispatcher.addEventListener(ARtisanSettingsEvent.CREATE_CALCULATIONS_CAMERA, createCalculationsCamera);
+				settingsLoader.dispatcher.addEventListener(ARtisanSettingsEvent.CREATE_DISPLAY_CAMERA, createDisplayCamera);
+			}
+			
+			// When the settings xml is loaded
+			private function onSettingsLoaded(event:ARtisanSettingsEvent):void
+			{
+				settingsLoader.dispatcher.removeEventListener(ARtisanSettingsEvent.SETTINGS_LOADED, onSettingsLoaded);
+				dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.SETTINGS_LOADED));
+				
+				trace("ARtisan successfully loaded the settings xml.");
+			}
+			
+			// When the settings xml is verified
+			private function onSettingsSchemaCorrect(event:Event):void
+			{
+				settingsLoader.dispatcher.removeEventListener(ARtisanSettingsEvent.SETTINGS_SCHEMA_CORRECT, onSettingsSchemaCorrect);
+				
+				trace("The settings xml was validated.");
+			}
+			
+			// When the AR parameters are loaded, create the FLARParam object
+			private function onARParametersLoaded(event:ARtisanSettingsEvent):void
+			{
+				settingsLoader.dispatcher.removeEventListener(ARtisanSettingsEvent.AR_PARAMETERS_LOADED, onARParametersLoaded);
+				
+				flarParam.loadARParam(event.extraInfo[0]);
+				flarParam.changeScreenSize(event.extraInfo[1], event.extraInfo[2]);
+				dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.AR_PARAMETERS_LOADED, flarParam));
+				
+				trace("ARtisan successfully loaded the AR parameters.");
+			}
+			
+			// When the FLARCodes have been configured, create the FLARMultiMarkerDetector
+			private function onFLARCodesConfigured(event:ARtisanSettingsEvent):void
+			{
+				settingsLoader.dispatcher.removeEventListener(ARtisanSettingsEvent.FLAR_CODES_CONFIGURED, onFLARCodesConfigured);
+				flarMultiMarkerDetector = new FLARMultiMarkerDetector(flarParam, event.extraInfo[0], event.extraInfo[1], event.extraInfo[0].length);
+				numberOfPatterns = event.extraInfo[0].length;
+				for(var i:int = 0; i < numberOfPatterns; i++)
+				{
+					calculators[i] = new PapervisionMatrixCalculator();
+				}
+				dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.FLAR_CODES_CONFIGURED, event.extraInfo));
+				
+				trace("ARtisan successfully created the FLARCodes.");
+			}
+			
+			// When the detector settings are loaded, pass them to the proper class variables
+			private function onDetectorSettingsLoaded(event:ARtisanSettingsEvent):void
+			{
+				detectorThreshold = event.extraInfo[0];
+				minimumDetectorConfidence = event.extraInfo[1];
+				dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.DETECTOR_SETTINGS_LOADED, event.extraInfo));
+				
+				trace("ARtisan successfully loaded the FLARMultiMarkerDetector settings.");
+			}
+			
+			// When the calculations camera settings are loaded, create the calculation data
+			private function createCalculationsCamera(event:ARtisanSettingsEvent):void
+			{
+				settingsLoader.dispatcher.removeEventListener(ARtisanSettingsEvent.CREATE_CALCULATIONS_CAMERA, createCalculationsCamera);
+				calculationsCamera = calculationData.init(event.extraInfo);
+				dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.CREATE_CALCULATIONS_CAMERA));
+				
+				trace("ARtisan successfully created the calculation data.");
+
+				settingsLoader.displayCameraSetup();
+			}
+			
+			// When the display camera settings are loaded, create the display video
+			private function createDisplayCamera(event:ARtisanSettingsEvent):void
+			{
+				settingsLoader.dispatcher.removeEventListener(ARtisanSettingsEvent.CREATE_DISPLAY_CAMERA, createDisplayCamera);
+				width = event.extraInfo[0];
+				height = event.extraInfo[1];
+				displayCamera = displayVideo.init(event.extraInfo);
+				dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.CREATE_DISPLAY_CAMERA));
+				
+				trace("ARtisan successfully created the display camera.");
+				
+				addEventListener(Event.ENTER_FRAME, onEnterFrame);
+			}
+			
+			// IEvery frame, if the camera is off, wait for it to turn on.  Otherwise call for marker detection
+			private function onEnterFrame(event:Event):void
+			{
+				if(!cameraOn)
+				{
+					checkCamera();
+				}
+				else
+				{
+					markerDetection();
+				}
+			}
+			
+			// Check to see if the camera has been allowed
+			private function checkCamera():void
+			{
+				if(!displayCamera.muted)
+				{
+					cameraOn = true;
+					dispatchEvent(new ARtisanCameraEvent(ARtisanCameraEvent.CAMERA_ALLOWED));
+				}
+			}
+			
+			// Detect markers and return a result array holding positions in the chosen format to the return function
+			private function markerDetection():void
+			{
+				var numberOfKnownMarkers:int;				
+				calculationData.updateData();	
+					
+				try
+				{
+					flarRGBRaster = new FLARRgbRaster_BitmapData(calculationData.data);
+					numberOfKnownMarkers = flarMultiMarkerDetector.detectMarkerLite(flarRGBRaster, detectorThreshold);
+				}
+				catch(error:*)
+				{
+					numberOfKnownMarkers = -1;
+				}
+				
+				if(numberOfKnownMarkers <= 0)
+				{
+					return;
+				}
+				
+				var returnArray:Array = [];
+				
+				for(var i:int = 0; i < numberOfPatterns; i++)
+				{
+					returnArray[i] = null;
+				}
+				
+				for(i = 0; i < numberOfKnownMarkers; i++)
+				{
+					var index:int = flarMultiMarkerDetector.getARCodeIndex(i);
+					var detectorConfidence:Number = flarMultiMarkerDetector.getConfidence(i);
+					
+					if(detectorConfidence < minimumDetectorConfidence)
+					{
+						continue;
+					}
+					
+					var flarTransMatResult:FLARTransMatResult = new FLARTransMatResult();
+					try
+					{
+						flarMultiMarkerDetector.getTransmationMatrix(i, flarTransMatResult);
+					}
+					catch(error:*)
+					{
+						continue;
+					}
+					
+					if(calculators[i])
+					{
+						var matrix:org.papervision3d.core.math.Matrix3D = (calculators[i] as PapervisionMatrixCalculator).calculate(flarTransMatResult, smoothing, smoothAmount);
+					
+						switch(returnType)
+						{
+							case ReturnType.PV3D_MATRIX:
+								returnArray[index] = matrix
+								break;
+							case ReturnType.XYZ:
+								returnArray[index] = xyzCalculator.calculate(matrix);
+								break;
+							default:
+								break;
+						}
+					}					
+				}
+				
+				outputFunction(returnArray);
+			}
+		]]>
+	</mx:Script>
+	<!-- Non Display Objects -->
+	<settings:SettingsLoader id="settingsLoader"/>
+	<calculations:CalculationData id="calculationData"/>
+	<calculations:XYZCalculator id="xyzCalculator"/>
+	<!-- Display Objects -->
+	<display:DisplayVideo id="displayVideo"/>
+</mx:Canvas>

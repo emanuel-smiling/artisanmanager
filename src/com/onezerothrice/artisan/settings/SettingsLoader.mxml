@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+	PROJECT: ARtisan
+	***************************************
+	
+	This work uses FLARToolkit developed by
+	Saqoosha
+	http://www.libspark.org/wiki/saqoosha/FLARToolKit
+	
+	and Papervision3D developed by
+	The Papervision3D Team
+	http://blog.papervision3d.org/
+	
+	ARtisan is a management system for FLARToolkit and Papervision3D.
+	Copyright (C)2009 OneZeroThrice
+
+	This program is free software; you can redistribute it and/or
+	modify it under the terms of the GNU General Public License
+	as published by the Free Software Foundation; either version 3
+	of the License, or (at your option) any later version.
+
+	This program is distributed, with ARtisan completely free, in the hope
+	that it will be useful,	but WITHOUT ANY WARRANTY; without even the
+	implied warranty of	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+	See the	GNU General Public License for more details.
+ 
+	You should have received a copy of the GNU General Public License
+	along with this framework; if not, write to the Free Software
+	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+	For further information please contact
+	info@onezerothrice.com
+ -->
+<mx:Object xmlns="*" xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:events="flash.events.*" xmlns:settings="com.onezerothrice.artisan.settings.*">
+	<mx:Script>
+		<![CDATA[
+			import com.onezerothrice.artisan.events.ARtisanSettingsEvent;
+
+			private var settingsXML:XML;
+		
+			// Load the ARtisan settings xml file, located in the src folder
+			public function loadSettings():void
+			{
+				var settingsLoader:URLLoader = new URLLoader();
+				settingsLoader.addEventListener(IOErrorEvent.IO_ERROR, onSettingsLoaderIOError);
+				settingsLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSettingsLoaderSecurityError);
+				settingsLoader.addEventListener(Event.COMPLETE, onSettingsLoaderComplete);
+				settingsLoader.load(new URLRequest("ARtisan_settings.xml"));
+			}
+			
+			// If the ARtisan settings xml file can't be found
+			private function onSettingsLoaderIOError(event:IOErrorEvent):void
+			{
+				throw new Error("ARtisan can not find the ARtisan_settings.xml file.  Please ensure that the file is in the src folder.");
+			}
+			
+			// If the ARtisan settings xml file can't be loaded, due to security settings
+			private function onSettingsLoaderSecurityError(event:SecurityErrorEvent):void
+			{
+				throw new Error("ARtisan is being blocked from loading the settings xml file by a security protocol on the server");
+			}
+			
+			// Create the settingsXML object and start loading AR parameters
+			private function onSettingsLoaderComplete(event:Event):void
+			{
+				event.target.removeEventListener(IOErrorEvent.IO_ERROR, onSettingsLoaderIOError);
+				event.target.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, onSettingsLoaderSecurityError);
+				event.target.removeEventListener(Event.COMPLETE, onSettingsLoaderComplete);
+				
+				settingsXML = new XML(event.target.data);
+				dispatcher.dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.SETTINGS_LOADED, settingsXML));
+				
+				testSettingsXML(settingsXML);
+							
+				var parametersLoader:URLLoader = new URLLoader();
+				parametersLoader.dataFormat = URLLoaderDataFormat.BINARY;
+				parametersLoader.addEventListener(IOErrorEvent.IO_ERROR, onParametersLoaderIOError);
+				parametersLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onParametersLoaderSecurityError);
+				parametersLoader.addEventListener(Event.COMPLETE, onParametersLoaderComplete);
+				parametersLoader.load(new URLRequest(settingsXML.artoolkit_parameters_path));
+			}
+			
+			// Test to make sure that the settingsXML object contains all the necessary parameters
+			private function testSettingsXML(settingsXML:XML):void
+			{
+				var testParameters:Array = ["artoolkit_parameters_path", "calculations_camera_width", "calculations_camera_height", "display_camera_width", "display_camera_height", "artoolkit_patterns", "frames_per_second", "detector_threshold", "minimum_detector_confidence"];
+				
+				for(var i:int = 0; i < testParameters.length; i++)
+				{
+					if(!settingsXML.hasOwnProperty(testParameters[i]))
+					{
+						throw new Error("The ARtisan settings xml schema does not contain the following value: " + testParameters[i]);
+					}
+				}
+				
+				var patternSectionTestParameters:Array = ["folder_location", "patterns_size", "border_percentage", "pattern_filename"];
+				
+				for(i = 0; i < patternSectionTestParameters.length; i++)
+				{
+					if(!settingsXML.artoolkit_patterns.hasOwnProperty(patternSectionTestParameters[i]))
+					{
+						throw new Error("The artoolkit_patterns section of the ARtisan settings xml schema does not contain the following value: " + patternSectionTestParameters[i]);
+					}
+				}
+				
+				dispatcher.dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.SETTINGS_SCHEMA_CORRECT));
+			}
+			
+			// If the AR parameters file can't be found
+			private function onParametersLoaderIOError(event:IOErrorEvent):void
+			{
+				throw new Error("ARtisan can not find the ARToolkit parameters file.  Please ensure that the file is in the location listed in ARtisan_settings.xml.");
+			}
+			
+			// If the AR parameters file can't be loaded, due to security settings
+			private function onParametersLoaderSecurityError(event:SecurityErrorEvent):void
+			{
+				throw new Error("ARtisan is being blocked from loading the ARToolkit parameters file by a security protocol on the server");
+			}
+			
+			// Return a ByteArray of the AR parameters and the calculations camera height and width to the main class, then call the function to begin FLARCodes setup
+			private function onParametersLoaderComplete(event:Event):void
+			{
+				event.target.removeEventListener(IOErrorEvent.IO_ERROR, onParametersLoaderIOError);
+				event.target.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, onParametersLoaderSecurityError);
+				event.target.removeEventListener(Event.COMPLETE, onParametersLoaderComplete);
+				
+				var arParameters:ByteArray = ByteArray(event.target.data);
+				dispatcher.dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.AR_PARAMETERS_LOADED, [arParameters, Number(settingsXML.calculations_camera_width), Number(settingsXML.calculations_camera_height)]));
+				
+				flarCodesSetup();
+			}
+			
+			// Setup he FLARCodes and return them to the main class
+			private function flarCodesSetup():void
+			{
+				const patternFolderLocation:String = settingsXML.artoolkit_patterns.folder_location;
+				var patternPaths:Array = [];
+				
+				for(var i:int = 0; i < settingsXML.artoolkit_patterns.pattern_filename.length(); i++)
+				{
+					patternPaths.push(patternFolderLocation + settingsXML.artoolkit_patterns.pattern_filename[i]);
+				}
+				
+				flarCodeConfigurationTool.dispatcher.addEventListener(ARtisanSettingsEvent.FLAR_CODES_CONFIGURED, onFLARCodesConfigured);
+				flarCodeConfigurationTool.setupARPatterns(patternPaths, Number(settingsXML.artoolkit_patterns.patterns_size), Number(settingsXML.artoolkit_patterns.border_percentage));
+			}
+			
+			// Once the FLARCodes are configured return them to the main class
+			private function onFLARCodesConfigured(event:ARtisanSettingsEvent):void
+			{
+				event.target.removeEventListener(ARtisanSettingsEvent.FLAR_CODES_CONFIGURED, onFLARCodesConfigured);
+				dispatcher.dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.FLAR_CODES_CONFIGURED, event.extraInfo));
+				detectorSetup();
+			}
+			
+			// Pass the detector settings to the main class
+			private function detectorSetup():void
+			{
+				dispatcher.dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.DETECTOR_SETTINGS_LOADED, [Number(settingsXML.detector_threshold), Number(settingsXML.minimum_detector_confidence)]));
+				calculationsCameraSetup();
+			}
+			
+			// Pass the calculations camera settings to the main class
+			private function calculationsCameraSetup():void
+			{
+				dispatcher.dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.CREATE_CALCULATIONS_CAMERA, [Number(settingsXML.calculations_camera_width), Number(settingsXML.calculations_camera_height), Number(settingsXML.frames_per_second)]));		
+			}
+			
+			// Pass the display camera settings to the main class
+			public function displayCameraSetup():void
+			{
+				dispatcher.dispatchEvent(new ARtisanSettingsEvent(ARtisanSettingsEvent.CREATE_DISPLAY_CAMERA, [Number(settingsXML.display_camera_width), Number(settingsXML.display_camera_height), Number(settingsXML.frames_per_second)]));
+			}
+		]]>
+	</mx:Script>
+	<events:EventDispatcher id="dispatcher"/>
+	<settings:FLARCodeConfigurationTool id="flarCodeConfigurationTool"/>
+</mx:Object>
